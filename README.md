@@ -60,17 +60,22 @@ Forge uses consumption/production rules and linear conservation over resource ma
 
 For the complete input and actor interface, see the [technical reference](docs/REFERENCE.md).
 
-## Project family
-
-- [Rho Observer](https://github.com/rhovision-org/rho-observer) — observe network readiness and evidence.
-- [Rho Weave](https://github.com/rhovision-org/rho-weave) — synthesize decisions under uncertainty.
-- [Rho Foundry](https://github.com/rhovision-org/rho-foundry) — generate contracts from finite integer resources, guards and goals.
-
-These are independent tools, not required runtime dependencies.
-
 ## Validation
 
 The original [151 runtime executions](evidence/runtime-original.json) were recorded before separation, in [Rho Weave at cbfa663](https://github.com/rhovision-org/rho-weave/tree/cbfa663e94d86c20c8f23b49a753d6141b084f30/forge). The standalone CI has now repeated all 151 native executions successfully using its own local harness. See the [standalone runtime evidence](evidence/runtime.json) and [4/4 successful CI jobs](https://github.com/rhovision-org/rho-forge/actions/runs/45790239766).
+
+## The Rho project family
+
+Four independent tools exploring different parts of building on RhoVision: observing a system, deciding under uncertainty, and generating executable contracts.
+
+| Project | What it does |
+| --- | --- |
+| [Rho Observer](https://github.com/rhovision-org/rho-observer) | Read-only network observations, coverage and evidence. |
+| [Rho Weave](https://github.com/rhovision-org/rho-weave) | Checked decision policies under partial information. |
+| **Rho Forge (you are here)** | Generate actors from resource-flow and conservation rules. |
+| [Rho Foundry](https://github.com/rhovision-org/rho-foundry) | Generate contracts from integer resources, guards and goals. |
+
+These are complementary design directions, not an integrated runtime pipeline. Forge and Foundry have overlapping but distinct specification formats and actor interfaces. No project requires the others to run.
 
 ## License
 
