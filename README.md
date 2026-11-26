@@ -67,7 +67,15 @@ flowchart LR
  G --> J["Manifest and plans"]
 ```
 
-Forge and Foundry overlap, but they are not the same compiler. Forge uses resource places and consume/produce rules, with explicit primitive plans in actor replies. Foundry uses integer deltas, general linear guards and goal predicates. Choose the representation that fits the workflow.
+## Give independent workflows their own revision
+
+The [venue example](examples/venues.json) describes four box offices. Each has its own seats and clerk operations. Forge discovers which places must move together and compiles each independent lane into a private actor.
+
+```sh
+python3 -m rhoforge examples/venues.json --partition --out build-venues
+```
+
+Two clerks can reserve seats in different lanes at revision zero. Two calls against the same lane and revision still compete for one commit. A mission spanning multiple places keeps those places together. See the [partitioned factory API and benchmark](docs/PARTITIONING.md).
 
 For the supported input format, actor calling convention, revision limits, actual Rholo execution and reproduction instructions, see the [technical reference](docs/REFERENCE.md) and [complete walkthrough](docs/GUIDE.md).
 
@@ -79,9 +87,7 @@ The standalone [runtime CI](https://github.com/rhovision-org/rho-forge/actions/r
 - **[Rho Weave](https://github.com/rhovision-org/rho-weave)** — Find a safe next move when information is missing.
 - **[Rho Foundry](https://github.com/rhovision-org/rho-foundry)** — Turn guarded rules into executable contracts.
 
-Forge and Foundry both generate contracts, but start from different descriptions. Observer is about network evidence; Weave is about decisions under uncertainty. Neither is needed to compile a Forge workflow.
-
-They share a direction, not an automatic integration. [See how the pieces could fit together](docs/ECOSYSTEM.md).
+Forge is for composed resource flows, and Foundry is for guarded arithmetic rules. Weave can derive a recovery policy from a Forge lane manifest. Observer supplies evidence for applications that need to anchor external reads. [How the projects fit together](docs/ECOSYSTEM.md)
 
 ## License
 

@@ -1,0 +1,46 @@
+{
+  "name": "venue_reservations",
+  "places": {
+    "free_a": {"capacity": 3, "initial": 3},
+    "held_a": {"capacity": 3, "initial": 0},
+    "issued_a": {"capacity": 3, "initial": 0},
+    "free_b": {"capacity": 3, "initial": 3},
+    "held_b": {"capacity": 3, "initial": 0},
+    "issued_b": {"capacity": 3, "initial": 0},
+    "free_c": {"capacity": 3, "initial": 3},
+    "held_c": {"capacity": 3, "initial": 0},
+    "issued_c": {"capacity": 3, "initial": 0},
+    "free_d": {"capacity": 3, "initial": 3},
+    "held_d": {"capacity": 3, "initial": 0},
+    "issued_d": {"capacity": 3, "initial": 0}
+  },
+  "roles": ["clerk", "manager"],
+  "transitions": [
+    {"name": "reserve_a", "role": "clerk", "consume": {"free_a": 1}, "produce": {"held_a": 1}},
+    {"name": "issue_a", "role": "clerk", "consume": {"held_a": 1}, "produce": {"issued_a": 1}},
+    {"name": "cancel_a", "role": "manager", "consume": {"held_a": 1}, "produce": {"free_a": 1}},
+    {"name": "reserve_b", "role": "clerk", "consume": {"free_b": 1}, "produce": {"held_b": 1}},
+    {"name": "issue_b", "role": "clerk", "consume": {"held_b": 1}, "produce": {"issued_b": 1}},
+    {"name": "cancel_b", "role": "manager", "consume": {"held_b": 1}, "produce": {"free_b": 1}},
+    {"name": "reserve_c", "role": "clerk", "consume": {"free_c": 1}, "produce": {"held_c": 1}},
+    {"name": "issue_c", "role": "clerk", "consume": {"held_c": 1}, "produce": {"issued_c": 1}},
+    {"name": "cancel_c", "role": "manager", "consume": {"held_c": 1}, "produce": {"free_c": 1}},
+    {"name": "reserve_d", "role": "clerk", "consume": {"free_d": 1}, "produce": {"held_d": 1}},
+    {"name": "issue_d", "role": "clerk", "consume": {"held_d": 1}, "produce": {"issued_d": 1}},
+    {"name": "cancel_d", "role": "manager", "consume": {"held_d": 1}, "produce": {"free_d": 1}}
+  ],
+  "invariants": {
+    "seats": {
+      "free_a": 1, "held_a": 1, "issued_a": 1,
+      "free_b": 1, "held_b": 1, "issued_b": 1,
+      "free_c": 1, "held_c": 1, "issued_c": 1,
+      "free_d": 1, "held_d": 1, "issued_d": 1
+    }
+  },
+  "missions": [
+    {"name": "reserve_all_a", "role": "clerk", "goal": {"held_a": 3}},
+    {"name": "reserve_all_b", "role": "clerk", "goal": {"held_b": 3}},
+    {"name": "reserve_all_c", "role": "clerk", "goal": {"held_c": 3}},
+    {"name": "reserve_all_d", "role": "clerk", "goal": {"held_d": 3}}
+  ]
+}

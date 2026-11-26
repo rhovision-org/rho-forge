@@ -3,6 +3,7 @@
 No source-language eval, arbitrary code execution, or network access.
 """
 from collections import deque
+from dataclasses import dataclass
 import hashlib
 import json
 import re
@@ -37,7 +38,18 @@ def mapping(v,keys,lo,hi,where):
 
 def encode(v): return json.dumps(v,ensure_ascii=True,sort_keys=True,separators=(',',':'))
 
-def compile_workflow(raw):
+@dataclass(frozen=True)
+class Workflow:
+    title: str
+    names: list
+    caps: list
+    initial: list
+    roles: list
+    transitions: dict
+    invariants: dict
+    missions: dict
+
+def parse_workflow(raw):
     obj(raw,['name','places','roles','transitions','invariants','missions'],'workflow')
     title=name(raw['name'],'name')
     places=raw['places']; need(isinstance(places,dict) and 1<=len(places)<=12,'places: expected 1..12')
@@ -76,11 +88,17 @@ def compile_workflow(raw):
         goal=mapping(m['goal'],names,0,1000,n+'.goal'); need(goal,'empty mission goal')
         need(all(v<=caps[names.index(k)] for k,v in goal.items()),'goal exceeds capacity')
         mission_defs[n]=(m['role'],goal)
+    return Workflow(title, names, caps, initial, roles, transitions, inv, mission_defs)
+
+def compile_markings(workflow):
+    names, caps, roles = workflow.names, workflow.caps, workflow.roles
+    transitions = workflow.transitions
     # Exhaustively enumerate the reachable bounded markings. Capacity is enforced before every edge.
-    states=[tuple(initial)]; ids={states[0]:0}; edges={}; q=deque([0]); count=0
+    ordered = sorted(transitions.items())
+    states=[tuple(workflow.initial)]; ids={states[0]:0}; edges={}; q=deque([0]); count=0
     while q:
         i=q.popleft(); s=states[i]; row={}; edges[i]=row
-        for n,(_,c,p) in sorted(transitions.items()):
+        for n,(_,c,p) in ordered:
             if any(x<a for x,a in zip(s,c)): continue
             target=tuple(x-a+b for x,a,b in zip(s,c,p))
             if any(x>cap for x,cap in zip(target,caps)): continue
@@ -92,39 +110,62 @@ def compile_workflow(raw):
     # Reverse BFS derives shortest authorized paths for every starting marking.
     # Deterministic lexical tie-breaking. Mission is an atomic macro, not a series of external calls.
     actions={r:{str(i):{} for i in range(len(states))} for r in roles}
+    mission_roles = {role for role, _ in workflow.missions.values()}
+    reverse = {role: [[] for _ in states] for role in mission_roles}
     for i,row in edges.items():
-        for n,j in row.items(): actions[transitions[n][0]][str(i)][n]={'target':j,'plan':[n]}
-    for n,(role,goal) in sorted(mission_defs.items()):
-        goals={i for i,s in enumerate(states) if all(s[names.index(k)]==v for k,v in goal.items())}
-        rev={i:[] for i in range(len(states))}
-        for i,row in edges.items():
-            for a,j in row.items():
-                if transitions[a][0]==role: rev[j].append(i)
+        for n,j in row.items():
+            role = transitions[n][0]
+            actions[role][str(i)][n]={'target':j,'plan':[n]}
+            if role in reverse:
+                reverse[role][j].append(i)
+    for n,(role,goal) in sorted(workflow.missions.items()):
+        goal_indices = [(names.index(k), v) for k, v in goal.items()]
+        goals={i for i,s in enumerate(states) if all(s[k]==v for k,v in goal_indices)}
+        rev = reverse[role]
         d={i:0 for i in goals}; queue=deque(sorted(goals))
         while queue:
             j=queue.popleft()
             for i in rev[j]:
                 if i not in d: d[i]=d[j]+1;queue.append(i)
+        # Edge rows already have lexical insertion order. Pick each next hop once.
+        next_hop = {
+            i: next((a, k) for a, k in edges[i].items()
+                    if transitions[a][0] == role and d.get(k) == distance - 1)
+            for i, distance in d.items() if distance
+        }
         for i in sorted(d):
             j=i; plan=[]
             while d[j]:
-                a,k=next((a,k) for a,k in sorted(edges[j].items()) if transitions[a][0]==role and d.get(k)==d[j]-1)
+                a,k=next_hop[j]
                 plan.append(a);j=k
             actions[role][str(i)][n]={'target':j,'plan':plan}
+    return {
+        'places': names, 'initial_state': 0,
+        'markings': [dict(zip(names,s)) for s in states],
+        'actions': actions, 'invariants': workflow.invariants, 'primitive_edges': count,
+        'mission_goals': {n: {'role': r, 'goal': g} for n, (r,g) in workflow.missions.items()},
+    }
+
+def compile_workflow(raw):
+    workflow = parse_workflow(raw)
+    title = workflow.title
     digest=hashlib.sha256(encode(raw).encode()).hexdigest()
-    manifest={'schema':'rho-forge/v1','name':title,'spec_sha256':digest,'factory':'rhoForge_'+title+'_'+digest[:16], 'roles':roles,'places':names,'initial_state':0,'max_epoch':MAX_EPOCH,'markings':[dict(zip(names,s)) for s in states], 'actions':actions,'invariants':inv,'primitive_edges':count,'mission_goals':{n:{'role':r,'goal':g} for n,(r,g) in mission_defs.items()}}
+    manifest={'schema':'rho-forge/v1','name':title,'spec_sha256':digest,'factory':'rhoForge_'+title+'_'+digest[:16], 'roles':workflow.roles,'max_epoch':MAX_EPOCH, **compile_markings(workflow)}
     source=emit(manifest)
     if len(source.encode())>MAX_SOURCE: raise LimitError('generated source limit; no source emitted')
     manifest['source_sha256']=hashlib.sha256(source.encode()).hexdigest()
     return manifest,source
 
 def emit(m):
+    out = ['// Rho Forge generated resource actor; spec sha256 '+m['spec_sha256'],
+           'contract @'+encode(m['factory'])+'(ret) = {']
+    return '\n'.join(out + emit_instance(m['roles'], m['actions']) + ['}']) + '\n'
+
+def emit_instance(roles, actions, *, send_only=False):
     # All identifiers/literals generated from validated data. No interpolation of arbitrary code.
     # One private cell serializes requests; every branch puts the cell back exactly once.
-    roles=m['roles']; channels=['cap'+str(i) for i in range(len(roles))]
-    out=['// Rho Forge generated resource actor; spec sha256 '+m['spec_sha256'],
-         'contract @'+encode(m['factory'])+'(ret) = {',
-         '  new cell, view, '+', '.join(channels)+' in {',
+    channels=['cap'+str(i) for i in range(len(roles))]
+    out=['  new cell, view, '+', '.join(channels)+' in {',
          '    cell!(0, 0) |',
          '    contract view(reply) = { for (@s, @v <- cell) { cell!(s, v) | reply!(("READ", s, v, [])) } } |']
     for role,channel in zip(roles,channels):
@@ -132,7 +173,7 @@ def emit(m):
                 '      for (@s, @v <- cell) {',
                 '        if (expected == v) {',
                 '          match (s, action) {']
-        for i,row in m['actions'][role].items():
+        for i,row in actions[role].items():
             for a,step in sorted(row.items()):
                 j=step['target']; plan=encode(step['plan'])
                 if not step['plan']:
@@ -143,8 +184,11 @@ def emit(m):
         out += ['            _ => { cell!(s, v) | reply!(("DENIED", s, v, [])) }',
                 '          }', '        } else { cell!(s, v) | reply!(("STALE", s, v, [])) }',
                 '      }', '    } |']
-    out += ['    ret!(*view, '+', '.join('*'+c for c in channels)+')','  }','}']
-    return '\n'.join(out)+'\n'
+    handles = ['*view', *('*'+c for c in channels)]
+    if send_only:
+        handles = ['bundle+{'+handle+'}' for handle in handles]
+    out += ['    ret!('+', '.join(handles)+')','  }']
+    return out
 
 class Actor:
     """Reference interpreter for generated actor, not a network runtime."""

@@ -19,7 +19,6 @@ jobs:
           python -m rhoforge examples/escrow.json --out build-escrow
           cmp examples/generated/factory.rho build-escrow/factory.rho
           cmp examples/generated/manifest.json build-escrow/manifest.json
-          if test -f evidence/runtime.json; then PYTHONPATH=. python tools/check_evidence.py; fi
   rholo:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -41,8 +40,13 @@ jobs:
         run: |
           PYTHONPATH=. python tools/probe_generated.py --binary .local/rholo/rnode --sha256 232d12bd5d3fadc8371c26ec6a888ea48a4062b1187bb63c35b9d19423f28ead --commit e63b7e5a8ccfcc25ff64860ac989d95a748eaaca --repeats 5 --output .local/runtime.json
           PYTHONPATH=. python tools/check_evidence.py .local/runtime.json
+          PYTHONPATH=. python tools/probe_partition.py --binary .local/rholo/rnode --sha256 232d12bd5d3fadc8371c26ec6a888ea48a4062b1187bb63c35b9d19423f28ead --commit e63b7e5a8ccfcc25ff64860ac989d95a748eaaca --out .local/partition-runtime.json
+          PYTHONPATH=. python tools/benchmark_partition.py --out .local/partition-benchmark.json
       - uses: actions/upload-artifact@v4
         with:
           name: forge-native-runtime
-          path: .local/runtime.json
+          path: |
+            .local/runtime.json
+            .local/partition-runtime.json
+            .local/partition-benchmark.json
           if-no-files-found: error
