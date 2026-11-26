@@ -6,6 +6,8 @@ Forge starts with where resources are and who can move them. It generates Rholan
 
 Created by [AixAria](https://github.com/aixaria0).
 
+A Forge manifest gives Weave the rules for recovery. Foundry handles contracts built around arithmetic, and Observer gives an application evidence for external reads. [How they fit around an actor](#what-happens-after-a-call-is-interrupted)
+
 ![Offices A and B each move three seats from free to held and commit from revision zero. Two calls aimed at a single fresh lane instead return one OK and one STALE.](docs/motion/overview.gif)
 
 [Static storyboard](docs/motion/overview.png) · [Text walkthrough](docs/motion/README.md)
